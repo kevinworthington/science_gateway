@@ -2,6 +2,7 @@ var api_request=null
 var markers =[]
 var marker_group = null
 var colors=['#00ff00','#ffff00','#ff7e00','#ff0000','#8f3f97','#7d0122']
+const API_KEY = "7A5BD8CD-E1C5-11EC-8561-42010A800005"// best to request your own contact@purpleair.com
 
 $(document).ready(function(){
     // do jQuery
@@ -25,11 +26,10 @@ $(document).ready(function(){
     //Add API call on map move
     map.on('moveend', function(e) {
         var b = map.getBounds();
-    
-    var url = 'https://api.purpleair.com/v1/sensors?fields=sensor_index,name,latitude,longitude,pm2.5_alt,last_modified&location_type=0&'
-    url+='nwlng='+b._southWest.lng+'&nwlat='+b._northEast.lat+'&selng='+b._northEast.lng+'&selat='+b._southWest.lat
-    url+='&api_key=7A5BD8CD-E1C5-11EC-8561-42010A800005'
-    make_map_change_request(url)
+        var url = 'https://api.purpleair.com/v1/sensors?fields=sensor_index,name,latitude,longitude,pm2.5_alt,last_modified&location_type=0&'
+        url+='nwlng='+b._southWest.lng+'&nwlat='+b._northEast.lat+'&selng='+b._northEast.lng+'&selat='+b._southWest.lat
+        url+='&api_key='+API_KEY
+        make_map_change_request(url,create_list)
     
     });
 
@@ -39,13 +39,18 @@ $(document).ready(function(){
  var api_request=null
  var markers =[]
  var marker_group = L.layerGroup()
- var make_map_change_request =function (url){
+ var make_map_change_request =function (url,call_back){
     if (api_request){ clearTimeout(api_request); }
     api_request =setTimeout(() => {
         $.ajax({
-            url: url, dataType: "json",
+            url: url,
             success: function (response) {
-                    create_list(response.data);
+                    if (response?.data){
+                        call_back(response.data);
+                    }else{
+                        call_back(response);
+                    }
+                        
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     console.log(xhr.status);
@@ -66,6 +71,15 @@ $(document).ready(function(){
         var marker = new L.Marker(new L.LatLng(s[2],s[3]), {
             icon:	new L.NumberedDivIcon({number: s[4]})
         });
+        marker.id = s[0]
+        // add marker click
+        marker.on("click", function(e) {
+            // marker.id will not work
+            get_chart_data(e.target.id);
+
+         });
+
+
         markers.push(marker);
         marker.addTo(marker_group);
      }
@@ -115,4 +129,14 @@ function get_color(num){
     var color = context.getImageData(Math.round(length*percent), 0, 1, 1)
     var d = color.data 
     return "rgb("+d[0]+", "+d[1]+", "+d[2]+")"
+}
+
+function get_chart_data(id){
+    var now=new Date()
+    var start_time=new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+   
+    var url = 'https://june2022.api.purpleair.com/v1/sensors/'+id+'/history/csv?start_timestamp='+start_time.getTime()/1000+'&end_timestamp='+now.getTime()/1000+'&fields=pm2.5_atm_a,pm2.5_atm_b&average=60'
+    url+='&api_key='+API_KEY
+    chart(url)
+    
 }
